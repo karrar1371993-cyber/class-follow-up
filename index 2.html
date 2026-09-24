@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سجل متابعة صفية شهري متقدم</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { cairo: ['Cairo', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Cairo', sans-serif; background:#f1f5f9; }
+    .modal-backdrop { background:rgba(15,23,42,.58); backdrop-filter:blur(3px); }
+    .modal { max-height:92vh; overflow:auto; }
+    .sticky-name { position:sticky; right:0; z-index:20; background:#fff; }
+    .sticky-actions { position:sticky; left:0; z-index:20; background:#fff; }
+    thead .sticky-name, thead .sticky-actions { z-index:40; background:#0f172a; }
+    .score-input { width:58px; }
+    .week-head { min-width:320px; }
+    .print-only { display:none; }
+    @media print {
+      @page { size:A4 portrait; margin:12mm; }
+      body { background:#fff !important; }
+      body > *:not(#printReport) { display:none !important; }
+      #printReport { display:block !important; }
+      .no-print { display:none !important; }
+    }
+  </style>
+</head>
+
+<body class="text-slate-800">
+  <div id="app" class="min-h-screen">
+    <header class="bg-slate-900 text-white shadow-lg">
+      <div class="max-w-[1800px] mx-auto px-4 py-4">
+        <div class="flex flex-col xl:flex-row gap-4 items-stretch xl:items-end">
+          <div class="flex-1">
+            <label class="block text-xs text-slate-300 mb-1">اسم المدرسة</label>
+            <input id="schoolName" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="اكتب اسم المدرسة">
+          </div>
+          <div class="w-full xl:w-60">
+            <label class="block text-xs text-slate-300 mb-1">الصف والشعبة</label>
+            <input id="className" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="مثال: السادس / أ">
+          </div>
+          <div class="w-full xl:w-48">
+            <label class="block text-xs text-slate-300 mb-1">المادة الدراسية</label>
+            <select id="subject" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none">
+              <option>الرياضيات</option><option>اللغة العربية</option><option>اللغة الإنكليزية</option>
+              <option>العلوم</option><option>الاجتماعيات</option><option>التربية الإسلامية</option><option>أخرى</option>
+            </select>
+          </div>
+          <div class="w-full xl:w-44">
+            <label class="block text-xs text-slate-300 mb-1">الشهر</label>
+            <select id="month" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none"></select>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="exportExcel()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap">
+              <i class="fa-solid fa-file-excel ml-1"></i> تصدير Excel
+            </button>
+            <button onclick="clearMonth()" class="flex-1 bg-rose-600 hover:bg-rose-700 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap">
+              <i class="fa-solid fa-trash-can ml-1"></i> مسح الشهر
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-[1800px] mx-auto p-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-4">
+        <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="openStudentsModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2.5 rounded-xl font-bold">
+              <i class="fa-solid fa-users-gear ml-1"></i> إدارة الطلاب
+            </button>
+            <button onclick="openRandomPicker()" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl font-bold">
+              <i class="fa-solid fa-dharmachakra ml-1"></i> اختيار عشوائي
+            </button>
+          </div>
+          <div class="relative w-full lg:w-96">
+            <i class="fa-solid fa-magnifying-glass absolute right-4 top-3.5 text-slate-400"></i>
+            <input id="search" oninput="renderTable()" class="w-full border border-slate-300 rounded-xl pr-11 pl-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="ابحث باسم الطالب...">
+          </div>
+        </div>
+      </div>
+
+      <div id="emptyState" class="hidden bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center">
+        <i class="fa-solid fa-user-plus text-5xl text-slate-300 mb-4"></i>
+        <h2 class="text-xl font-bold mb-2">لا يوجد طلاب حتى الآن</h2>
+        <p class="text-slate-500 mb-5">ابدأ بإضافة الطلاب أو استيرادهم من ملف.</p>
+        <button onclick="openStudentsModal()" class="bg-sky-600 text-white px-5 py-2.5 rounded-xl font-bold">إدارة الطلاب</button>
+      </div>
+
+      <div id="tableWrap" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-auto">
+        <table id="mainTable" class="border-collapse min-w-[1700px] w-full text-sm">
+          <thead></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 text-xs text-slate-500 flex flex-wrap gap-x-5 gap-y-2">
+        <span><i class="fa-solid fa-floppy-disk ml-1"></i> الحفظ تلقائي في المتصفح.</span>
+        <span><i class="fa-solid fa-circle-info ml-1"></i> التوزيع: ٤ أسابيع × ٢٠ = ٨٠، ودفتر + سلوك + نشاط = ٢٠، المجموع المستمر = ١٠٠، ثم الامتحان الشهري = ١٠٠، والدرجة النهائية = (المجموع المستمر + الامتحان) ÷ ٢.</span>
+        <span id="saveStatus"></span>
+      </div>
+    </main>
+  </div>
+
+  <!-- Students Modal -->
+  <div id="studentsModal" class="hidden fixed inset-0 modal-backdrop z-[100] items-center justify-center p-4">
+    <div class="modal bg-white w-full max-w-3xl rounded-2xl shadow-2xl">
+      <div class="p-5 border-b flex justify-between items-center">
+        <div><h2 class="text-xl font-extrabold">إدارة الطلاب</h2><p class="text-sm text-slate-500 mt-1">الصق الأسماء، أو استورد ملف Excel/Word.</p></div>
+        <button onclick="closeModal('studentsModal')" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input id="studentFile" type="file" accept=".xlsx,.xls,.csv,.docx,.doc" class="hidden" onchange="importStudentsFile(event)">
+        <button onclick="document.getElementById('studentFile').click()" class="w-full border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl p-5 text-sky-700 font-bold">
+          <i class="fa-solid fa-file-import text-2xl mb-2 block"></i> استيراد من Excel / Word / CSV
+        </button>
+        <div>
+          <label class="font-bold block mb-2">قائمة الأسماء</label>
+          <textarea id="studentText" rows="12" class="w-full border rounded-xl p-4 outline-none focus:ring-2 focus:ring-sky-500" placeholder="ضع اسم كل طالب في سطر مستقل..."></textarea>
+        </div>
+        <div class="flex flex-wrap gap-2 justify-between">
+          <button onclick="document.getElementById('studentText').value=''" class="px-4 py-2.5 rounded-xl border border-slate-300">تفريغ الحقل</button>
+          <div class="flex gap-2">
+            <button onclick="saveStudents()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold">حفظ الطلاب</button>
+            <button onclick="closeModal('studentsModal')" class="px-5 py-2.5 rounded-xl border">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student report modal -->
+  <div id="reportModal" class="hidden fixed inset-0 modal-backdrop z-[110] items-center justify-center p-4">
+    <div class="modal bg-white w-full max-w-3xl rounded-2xl shadow-2xl">
+      <div class="p-5 border-b flex justify-between items-center">
+        <div><h2 id="reportTitle" class="text-xl font-extrabold">تقرير الطالب</h2><p id="reportSubtitle" class="text-sm text-slate-500"></p></div>
+        <button onclick="closeModal('reportModal')" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="reportContent" class="p-5"></div>
+    </div>
+  </div>
+
+  <!-- Random picker -->
+  <div id="pickerModal" class="hidden fixed inset-0 modal-backdrop z-[120] items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl text-center p-7">
+      <button onclick="closeModal('pickerModal')" class="float-left text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      <i class="fa-solid fa-dharmachakra text-5xl text-violet-600 mb-3"></i>
+      <h2 class="text-2xl font-extrabold">الاختيار العشوائي</h2>
+      <div id="pickedStudent" class="my-8 text-3xl font-extrabold min-h-12">اضغط للبدء</div>
+      <button onclick="pickStudent()" class="bg-violet-600 hover:bg-violet-700 text-white px-8 py-3 rounded-xl font-bold">اختيار طالب</button>
+    </div>
+  </div>
+
+  <!-- Print report -->
+  <section id="printReport" class="print-only"></section>
+
+<script>
+const MONTHS = ['أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر','يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو'];
+const WEEKS = ['الأسبوع الأول','الأسبوع الثاني','الأسبوع الثالث','الأسبوع الرابع'];
+const MAX_PER_WEEK = 20;
+const MAX_NOTEBOOK = 20;
+const MAX_MONTHLY_EXAM = 100;
+const STORAGE_KEY = 'advancedClassRecord_v1';
+
+let state = {
+  settings: { school:'', className:'', subject:'الرياضيات', month:'أغسطس' },
+  students: [],
+  months: {}
+};
+let currentReportId = null;
+
+const $ = id => document.getElementById(id);
+
+function defaultMonthData() {
+  return {};
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = {...state, ...JSON.parse(raw)};
+  } catch(e) {}
+  if (!state.months) state.months = {};
+  if (!state.students) state.students = [];
+}
+function currentKey() {
+  return `${state.settings.subject}__${state.settings.month}`;
+}
+function monthData() {
+  const key = currentKey();
+  if (!state.months[key]) state.months[key] = defaultMonthData();
+  return state.months[key];
+}
+function ensureStudentData(id) {
+  const md = monthData();
+  if (!md[id]) {
+    md[id] = {
+      weeks: WEEKS.map(() => ({score:0})),
+      notebookBehaviorActivity: 0,
+      monthlyExam: 0,
+      overall:''
+    };
+  }
+  return md[id];
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  $('saveStatus').textContent = 'آخر حفظ: ' + new Date().toLocaleTimeString('ar-IQ');
+}
+function setup() {
+  MONTHS.forEach(m => $('month').insertAdjacentHTML('beforeend', `<option>${m}</option>`));
+  loadState();
+  $('schoolName').value = state.settings.school;
+  $('className').value = state.settings.className;
+  $('subject').value = state.settings.subject;
+  $('month').value = state.settings.month;
+
+  ['schoolName','className'].forEach(id => $(id).addEventListener('input', () => {
+    state.settings[id === 'schoolName' ? 'school' : 'className'] = $(id).value;
+    saveState();
+  }));
+  $('subject').addEventListener('change', () => { state.settings.subject = $('subject').value; saveState(); renderTable(); });
+  $('month').addEventListener('change', () => { state.settings.month = $('month').value; saveState(); renderTable(); });
+  renderTable();
+}
+function openModal(id) {
+  $(id).classList.remove('hidden'); $(id).classList.add('flex');
+}
+function closeModal(id) {
+  $(id).classList.add('hidden'); $(id).classList.remove('flex');
+}
+function openStudentsModal() {
+  $('studentText').value = state.students.map(s => s.name).join('\\n');
+  openModal('studentsModal');
+}
+function saveStudents() {
+  const names = $('studentText').value.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const old = new Map(state.students.map(s=>[s.name,s]));
+  state.students = names.map((name,i)=> old.get(name) || {id: crypto.randomUUID(), name});
+  saveState();
+  closeModal('studentsModal');
+  renderTable();
+}
+function importStudentsFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  if (['xlsx','xls','csv'].includes(ext)) {
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, {type:'array'});
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+        const names = rows.flat().map(v=>String(v).trim()).filter(Boolean);
+        $('studentText').value = [...new Set(names)].join('\\n');
+      } catch(err) { alert('تعذر قراءة ملف Excel.'); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.onload = ev => {
+      const text = ev.target.result.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();
+      $('studentText').value = text.split(/[،,\\n]/).map(x=>x.trim()).filter(Boolean).join('\\n');
+    };
+    reader.readAsText(file);
+  }
+}
+function scoreOf(w) { return Number(w.score || 0); }
+function continuousTotal(data) {
+  return WEEKS.reduce((sum,_,i)=>sum+scoreOf(data.weeks[i]),0) + Number(data.notebookBehaviorActivity || 0);
+}
+function finalGrade(data) {
+  return (continuousTotal(data) + Number(data.monthlyExam || 0)) / 2;
+}
+function setWeekScore(id, week, value) {
+  const data = ensureStudentData(id);
+  data.weeks[week].score = Math.max(0, Math.min(20, Number(value)||0));
+  saveState(); renderTable();
+}
+function setNotebookScore(id, value) {
+  const data = ensureStudentData(id);
+  data.notebookBehaviorActivity = Math.max(0, Math.min(20, Number(value)||0));
+  saveState(); renderTable();
+}
+function setMonthlyExam(id, value) {
+  const data = ensureStudentData(id);
+  data.monthlyExam = Math.max(0, Math.min(100, Number(value)||0));
+  saveState(); renderTable();
+}
+function renderHeader() {
+  let h = `<tr>
+    <th rowspan="2" class="sticky-name px-3 py-3 border-b border-slate-700 text-right min-w-[220px]">اسم الطالب</th>`;
+  WEEKS.forEach(w => h += `<th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[110px]">${w}<br><span class="text-slate-300 text-xs">٢٠ درجة</span></th>`);
+  h += `<th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[145px]">دفتر + سلوك + نشاط<br><span class="text-slate-300 text-xs">٢٠ درجة</span></th>
+        <th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[135px]">المجموع المستمر<br><span class="text-slate-300 text-xs">١٠٠ درجة</span></th>
+        <th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الامتحان الشهري<br><span class="text-slate-300 text-xs">١٠٠ درجة</span></th>
+        <th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الدرجة النهائية<br><span class="text-slate-300 text-xs">(المجموع ÷ ٢)</span></th>
+        <th rowspan="2" class="px-3 py-3 border-r border-slate-700 min-w-[150px]">التقييم العام</th>
+        <th rowspan="2" class="sticky-actions px-3 py-3 border-r border-slate-700 min-w-[120px]">الإجراءات</th></tr>`;
+  $('mainTable').querySelector('thead').innerHTML = h;
+}
+function renderTable() {
+  renderHeader();
+  const q = $('search').value.trim().toLowerCase();
+  const list = state.students.filter(s=>s.name.toLowerCase().includes(q));
+  $('emptyState').classList.toggle('hidden', state.students.length !== 0);
+  $('tableWrap').classList.toggle('hidden', state.students.length === 0);
+  let html = '';
+  list.forEach((s, index) => {
+    const d = ensureStudentData(s.id);
+    html += `<tr class="hover:bg-slate-50 border-b">
+      <td class="sticky-name px-3 py-3 font-bold border-l border-slate-200">${index+1}. ${escapeHtml(s.name)}</td>`;
+    d.weeks.forEach((w,wi)=>{
+      html += `<td class="px-2 py-2 border-r border-slate-200 text-center">
+        <input type="number" min="0" max="20" value="${w.score}" onchange="setWeekScore('${s.id}',${wi},this.value)" class="score-input border rounded-lg text-center py-1.5 focus:ring-2 focus:ring-sky-400">
+      </td>`;
+    });
+    const cont = continuousTotal(d);
+    const exam = Number(d.monthlyExam||0);
+    const final = finalGrade(d);
+    html += `<td class="px-2 py-2 border-r border-slate-200 text-center">
+        <input type="number" min="0" max="20" value="${d.notebookBehaviorActivity}" onchange="setNotebookScore('${s.id}',this.value)" class="score-input border rounded-lg text-center py-1.5 focus:ring-2 focus:ring-sky-400">
+      </td>
+      <td class="px-3 py-3 text-center font-extrabold">${cont} / 100</td>
+      <td class="px-2 py-2 border-r border-slate-200 text-center">
+        <input type="number" min="0" max="100" value="${exam}" onchange="setMonthlyExam('${s.id}',this.value)" class="score-input border rounded-lg text-center py-1.5 focus:ring-2 focus:ring-sky-400">
+      </td>
+      <td class="px-3 py-3 text-center font-extrabold">${final % 1 === 0 ? final : final.toFixed(1)} / 100</td>
+      <td class="px-3 py-3 text-center">
+        <select onchange="setOverall('${s.id}',this.value)" class="border rounded-lg px-2 py-1.5">
+          <option value="" ${!d.overall?'selected':''}>اختر</option>
+          ${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </td>
+      <td class="sticky-actions px-2 py-2 text-center border-r border-slate-200">
+        <button onclick="openReport('${s.id}')" class="text-sky-600 hover:text-sky-800 mx-1" title="التقرير"><i class="fa-solid fa-chart-column"></i></button>
+        <button onclick="deleteStudent('${s.id}')" class="text-rose-600 hover:text-rose-800 mx-1" title="حذف"><i class="fa-solid fa-user-xmark"></i></button>
+      </td></tr>`;
+  });
+  $('tableBody').innerHTML = html || `<tr><td colspan="20" class="text-center p-8 text-slate-500">لا توجد نتائج مطابقة للبحث.</td></tr>`;
+}
+function setOverall(id, value) {
+  ensureStudentData(id).overall = value;
+  saveState(); renderTable();
+}
+function deleteStudent(id) {
+  const s = state.students.find(x=>x.id===id);
+  if (!s || !confirm(`هل تريد حذف الطالب "${s.name}"؟`)) return;
+  state.students = state.students.filter(x=>x.id!==id);
+  Object.values(state.months).forEach(m=>delete m[id]);
+  saveState(); renderTable();
+}
+function openReport(id) {
+  const s = state.students.find(x=>x.id===id);
+  if (!s) return;
+  currentReportId = id;
+  const d = ensureStudentData(id);
+  $('reportTitle').textContent = `التقرير الشهري: ${s.name}`;
+  $('reportSubtitle').textContent = `${state.settings.school || 'المدرسة'} — ${state.settings.className || 'الصف'} — ${state.settings.subject} — ${state.settings.month}`;
+  let rows = '';
+  d.weeks.forEach((w,i)=>{
+    rows += `<tr><td class="border p-2">${WEEKS[i]}</td><td class="border p-2 text-center">${w.score}</td></tr>`;
+  });
+  $('reportContent').innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">المجموع المستمر</div><div class="text-2xl font-extrabold">${continuousTotal(d)} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">دفتر + سلوك + نشاط</div><div class="text-2xl font-extrabold">${d.notebookBehaviorActivity} / 20</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الامتحان الشهري</div><div class="text-2xl font-extrabold">${d.monthlyExam} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الدرجة النهائية</div><div class="text-2xl font-extrabold">${finalGrade(d)} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">التقييم</div><div class="font-bold mt-1">${d.overall || 'غير محدد'}</div></div>
+    </div>
+    <div class="overflow-auto">
+      <table class="w-full border-collapse text-sm">
+        <thead><tr class="bg-slate-100"><th class="border p-2">الأسبوع</th><th class="border p-2">الدرجة / ٢٠</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="grid md:grid-cols-2 gap-3 mt-4">
+      <label class="block"><span class="font-bold block mb-2">دفتر + سلوك + نشاط (٢٠)</span>
+        <input type="number" min="0" max="20" value="${d.notebookBehaviorActivity}" onchange="setNotebookScore('${s.id}',this.value); openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5">
+      </label>
+      <label class="block"><span class="font-bold block mb-2">الامتحان الشهري (١٠٠)</span>
+        <input type="number" min="0" max="100" value="${d.monthlyExam}" onchange="setMonthlyExam('${s.id}',this.value); openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5">
+      </label>
+    </div>
+    <div class="mt-5">
+      <label class="font-bold block mb-2">التقييم العام</label>
+      <select onchange="setOverallFromReport(this.value)" class="border rounded-xl px-4 py-2.5 w-full">
+        <option value="">اختر التقييم</option>
+        ${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}
+      </select>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button onclick="printStudentReport()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold"><i class="fa-solid fa-print ml-1"></i> طباعة تقرير A4</button>
+      <button onclick="closeModal('reportModal')" class="border px-5 py-2.5 rounded-xl">إغلاق</button>
+    </div>`;
+  openModal('reportModal');
+}
+function setOverallFromReport(value) {
+  if (!currentReportId) return;
+  setOverall(currentReportId, value);
+  openReport(currentReportId);
+}
+function printStudentReport() {
+  const s = state.students.find(x=>x.id===currentReportId);
+  if (!s) return;
+  const d = ensureStudentData(s.id);
+  let rows = d.weeks.map((w,i)=>`<tr><td>${WEEKS[i]}</td><td>${w.score}</td></tr>`).join('');
+  const fmt = n => Number.isInteger(n) ? n : Number(n).toFixed(1);
+  $('printReport').innerHTML = `
+    <div dir="rtl" style="font-family:Cairo,Arial,sans-serif;color:#111">
+      <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:18px">
+        <div style="font-size:16px;font-weight:700">جمهورية العراق</div>
+        <div style="font-size:18px;font-weight:800">تقييم التلاميذ لشهر ${escapeHtml(state.settings.month)}</div>
+        <div style="font-size:13px">${escapeHtml(state.settings.school || '')}</div>
+      </div>
+      <table style="width:100%;margin-bottom:16px;font-size:13px"><tr>
+        <td><b>الطالب:</b> ${escapeHtml(s.name)}</td><td><b>الصف:</b> ${escapeHtml(state.settings.className || '')}</td>
+      </tr><tr>
+        <td><b>المادة:</b> ${escapeHtml(state.settings.subject)}</td><td><b>الشهر:</b> ${escapeHtml(state.settings.month)}</td>
+      </tr></table>
+      <table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px">
+        <thead><tr style="background:#eee"><th>الأسبوع</th><th>الدرجة / ٢٠</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px">
+        <tr><td style="border:1px solid #aaa;padding:8px">دفتر + سلوك + نشاط</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.notebookBehaviorActivity} / 20</td></tr>
+        <tr><td style="border:1px solid #aaa;padding:8px"><b>المجموع المستمر</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${continuousTotal(d)} / 100</b></td></tr>
+        <tr><td style="border:1px solid #aaa;padding:8px">الامتحان الشهري</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.monthlyExam} / 100</td></tr>
+        <tr><td style="border:1px solid #aaa;padding:8px"><b>الدرجة النهائية</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${fmt(finalGrade(d))} / 100</b></td></tr>
+        <tr><td style="border:1px solid #aaa;padding:8px">التقييم العام</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${escapeHtml(d.overall || 'غير محدد')}</td></tr>
+      </table>
+      <div style="margin-top:70px;display:flex;justify-content:space-around;text-align:center">
+        <div>معلم المادة<br><br>____________________<br>التوقيع</div>
+        <div>مدير المدرسة<br><br>____________________<br>التوقيع والختم</div>
+      </div>
+    </div>`;
+  window.print();
+}
+function openRandomPicker() {
+  if (!state.students.length) return alert('أضف الطلاب أولاً.');
+  $('pickedStudent').textContent = 'اضغط للبدء';
+  openModal('pickerModal');
+}
+function pickStudent() {
+  const names = state.students.map(s=>s.name);
+  let i=0, cycles=0;
+  const el=$('pickedStudent');
+  const timer=setInterval(()=>{
+    el.textContent=names[i++%names.length];
+    cycles++;
+    if(cycles>18){ clearInterval(timer); el.textContent=names[Math.floor(Math.random()*names.length)]; }
+  },70);
+}
+function clearMonth() {
+  if (!confirm(`سيتم مسح جميع درجات ${state.settings.subject} لشهر ${state.settings.month}. هل أنت متأكد؟`)) return;
+  delete state.months[currentKey()];
+  saveState(); renderTable();
+}
+function exportExcel() {
+  if (!state.students.length) return alert('لا توجد بيانات لتصديرها.');
+  const rows = state.students.map((s,i)=>{
+    const d=ensureStudentData(s.id);
+    const r={ 'ت':i+1, 'اسم الطالب':s.name };
+    d.weeks.forEach((w,wi)=> r[`${WEEKS[wi]} (٢٠)`]=w.score);
+    r['دفتر + سلوك + نشاط (٢٠)']=d.notebookBehaviorActivity;
+    r['المجموع المستمر (١٠٠)']=continuousTotal(d);
+    r['الامتحان الشهري (١٠٠)']=d.monthlyExam;
+    r['الدرجة النهائية (المجموع ÷ ٢)']=finalGrade(d);
+    r['التقييم العام']=d.overall || '';
+    return r;
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.max(14,Math.min(34,k.length+5))}));
+  ws['!autofilter']={ref:ws['!ref']};
+  ws['!sheetViews']=[{rightToLeft:true}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'تقييم التلاميذ');
+  const safe=s=>s.replace(/[\\\\/:*?"<>|]/g,'-').trim();
+  const filename=`تقييم التلاميذ - ${safe(state.settings.subject)} - ${safe(state.settings.month)}.xlsx`;
+  XLSX.writeFile(wb,filename,{bookType:'xlsx',compression:true});
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+setup();
+</script>
+</body>
+</html>
