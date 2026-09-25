@@ -587,7 +587,10 @@ function printClassReport(){
     <div><span>ضعيف</span><b>${counts['ضعيف']}</b></div>
     <div><span>بيانات ناقصة</span><b>${students.length-completed.length}</b></div>
   </div>`;
-  const w=window.open('','_blank'); if(!w)return;
+  const school_img = '';
+  const min_img = '';
+  const w=window.open('','_blank');
+  if(!w){ alert('يرجى السماح بالنوافذ المنبثقة لهذا الموقع، ثم الضغط على طباعة التقرير مرة أخرى.'); return; }
   w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير الشعبة</title><style>
     @page{size:A4 landscape;margin:12mm}
     *{box-sizing:border-box}body{font-family:Cairo,Arial,sans-serif;color:#111;margin:0;font-size:11px}
