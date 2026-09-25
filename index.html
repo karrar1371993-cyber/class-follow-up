@@ -327,20 +327,20 @@ function importStudentsFile(e){
   e.target.value='';
 }
 
-function continuousTotal(data){return CATEGORIES.reduce((sum,[key,,max])=>sum+Math.min(max,Number(data[key]||0)),0)}
-function finalGrade(data){return (continuousTotal(data)+Number(data.monthlyExam||0))/2}
-function automaticEvaluation(final){const n=Number(final||0);if(n<50)return 'ضعيف';if(n<60)return 'مقبول';if(n<70)return 'متوسط';if(n<80)return 'جيد';if(n<90)return 'جيد جداً';return 'ممتاز'}
-function fmt(n){return Number.isInteger(Number(n))?Number(n):Number(n).toFixed(1)}
+function continuousTotal(data){return Math.round(CATEGORIES.reduce((sum,[key,,max])=>sum+Math.min(max,Number(data[key]||0)),0))}
+function finalGrade(data){return Math.round((continuousTotal(data)+Math.round(Number(data.monthlyExam||0)))/2)}
+function automaticEvaluation(final){const n=Math.round(Number(final||0));if(n<50)return 'ضعيف';if(n<60)return 'مقبول';if(n<70)return 'متوسط';if(n<80)return 'جيد';if(n<90)return 'جيد جداً';return 'ممتاز'}
+function fmt(n){return Math.round(Number(n)||0)}
 function setCategoryScore(id,key,value){
   const d=ensureStudentData(id);
   const cat=CATEGORIES.find(x=>x[0]===key);
   if(!cat)return;
-  d[key]=Math.max(0,Math.min(cat[2],Number(value)||0));
+  d[key]=Math.round(Math.max(0,Math.min(cat[2],Number(value)||0)));
   saveState();renderTable();
 }
 function setMonthlyExam(id,value){
   const d=ensureStudentData(id);
-  d.monthlyExam=Math.max(0,Math.min(100,Number(value)||0));
+  d.monthlyExam=Math.round(Math.max(0,Math.min(100,Number(value)||0)));
   saveState();renderTable();
 }
 
