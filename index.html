@@ -442,7 +442,10 @@ function studentMonthData(id,month,section){
   const md=getMonthDataFor(month,section);
   return md[id] || {shortTests:0,dailyPrep:0,homework:0,notebook:0,absence:0,behavior:0,monthlyExam:0};
 }
-function hasCompleteScores(d){return CATEGORIES.every(([key])=>Number(d[key]||0)>0) && Number(d.monthlyExam||0)>0;}
+function hasCompleteScores(d){
+  const isEntered=v => v!=='' && v!==null && v!==undefined && Number.isFinite(Number(v));
+  return CATEGORIES.every(([key])=>isEntered(d[key])) && isEntered(d.monthlyExam);
+}
 function renderTable(){
   renderHeader();
   const q=($('search').value||'').trim().toLowerCase();
