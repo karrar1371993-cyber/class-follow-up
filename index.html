@@ -109,7 +109,7 @@
 
     <div class="mt-4 text-xs text-slate-500 flex flex-wrap gap-x-5 gap-y-2">
       <span><i class="fa-solid fa-floppy-disk ml-1"></i> الحفظ تلقائي في المتصفح.</span>
-      <span><i class="fa-solid fa-circle-info ml-1"></i> التوزيع: ٤ أسابيع × ٢٠ = ٨٠، ودفتر + سلوك + نشاط = ٢٠، المجموع المستمر = ١٠٠، والدرجة النهائية = (المجموع المستمر + الامتحان الشهري) ÷ ٢.</span>
+      <span><i class="fa-solid fa-circle-info ml-1"></i> التوزيع: ٤ أسابيع × ٢٠ = ٨٠، ودفتر + سلوك + نشاط = ٢٠، المجموع الشفوي = ١٠٠، والدرجة النهائية = (المجموع الشفوي + الامتحان الشهري) ÷ ٢.</span>
       <span id="saveStatus"></span>
     </div>
   </main>
@@ -165,11 +165,11 @@
 <section id="printReport" class="print-only"></section>
 
 <script>
-const MONTHS=['أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر','يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو'];
+const MONTHS=['تشرين الأول','تشرين الثاني','كانون الأول','آذار','نيسان'];
 const WEEKS=['الأسبوع الأول','الأسبوع الثاني','الأسبوع الثالث','الأسبوع الرابع'];
 const STORAGE_KEY='advancedClassRecord_v2';
 const LEGACY_STORAGE_KEY='advancedClassRecord_v1';
-let state={settings:{school:'',className:'',subject:'الرياضيات',month:'أغسطس'},students:[],months:{}};
+let state={settings:{school:'',className:'',subject:'الرياضيات',month:'تشرين الأول'},students:[],months:{}};
 let currentReportId=null;
 const $=id=>document.getElementById(id);
 
@@ -258,7 +258,7 @@ function setup(){
   $('schoolName').value=state.settings.school||'';
   $('className').value=state.settings.className||'';
   $('subject').value=state.settings.subject||'الرياضيات';
-  $('month').value=state.settings.month||'أغسطس';
+  $('month').value=state.settings.month||'تشرين الأول';
 
   ['schoolName','className'].forEach(id=>$(id).addEventListener('input',()=>{
     state.settings[id==='schoolName'?'school':'className']=$(id).value;saveState();
@@ -337,7 +337,7 @@ function renderHeader(){
     <th class="sticky-name px-3 py-3 border-b border-slate-700 text-right min-w-[220px]">اسم الطالب</th>
     ${WEEKS.map(w=>`<th class="px-3 py-3 border-r border-slate-700 min-w-[110px]">${w}<br><span class="text-slate-300 text-xs">٢٠ درجة</span></th>`).join('')}
     <th class="px-3 py-3 border-r border-slate-700 min-w-[145px]">دفتر + سلوك + نشاط<br><span class="text-slate-300 text-xs">٢٠</span></th>
-    <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">المجموع المستمر<br><span class="text-slate-300 text-xs">١٠٠</span></th>
+    <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">المجموع الشفوي<br><span class="text-slate-300 text-xs">١٠٠</span></th>
     <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الامتحان الشهري<br><span class="text-slate-300 text-xs">١٠٠</span></th>
     <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الدرجة النهائية<br><span class="text-slate-300 text-xs">(÷٢)</span></th>
     <th class="px-3 py-3 border-r border-slate-700 min-w-[150px]">التقييم العام</th>
@@ -426,7 +426,7 @@ function openReport(id){
   $('reportSubtitle').textContent=`${state.settings.school||'المدرسة'} — ${state.settings.className||'الصف'} — ${state.settings.subject} — ${state.settings.month}`;
   $('reportContent').innerHTML=`
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">المجموع المستمر</div><div class="text-2xl font-extrabold">${continuousTotal(d)} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">المجموع الشفوي</div><div class="text-2xl font-extrabold">${continuousTotal(d)} / 100</div></div>
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الامتحان الشهري</div><div class="text-2xl font-extrabold">${d.monthlyExam} / 100</div></div>
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الدرجة النهائية</div><div class="text-2xl font-extrabold">${fmt(finalGrade(d))} / 100</div></div>
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">التقييم</div><div class="font-bold mt-1">${d.overall||'غير محدد'}</div></div>
@@ -464,12 +464,12 @@ function printStudentReport(){
     <table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px"><thead><tr style="background:#eee"><th>الأسبوع</th><th>الدرجة / ٢٠</th></tr></thead><tbody>${rows}</tbody></table>
     <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px">
       <tr><td style="border:1px solid #aaa;padding:8px">دفتر + سلوك + نشاط</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.notebookBehaviorActivity} / 20</td></tr>
-      <tr><td style="border:1px solid #aaa;padding:8px"><b>المجموع المستمر</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${continuousTotal(d)} / 100</b></td></tr>
+      <tr><td style="border:1px solid #aaa;padding:8px"><b>المجموع الشفوي</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${continuousTotal(d)} / 100</b></td></tr>
       <tr><td style="border:1px solid #aaa;padding:8px">الامتحان الشهري</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.monthlyExam} / 100</td></tr>
       <tr><td style="border:1px solid #aaa;padding:8px"><b>الدرجة النهائية</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${fmt(finalGrade(d))} / 100</b></td></tr>
       <tr><td style="border:1px solid #aaa;padding:8px">التقييم العام</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${escapeHtml(d.overall||'غير محدد')}</td></tr>
     </table>
-    <div style="margin-top:70px;display:flex;justify-content:space-around;text-align:center"><div>معلم المادة<br><br>____________________<br>التوقيع</div><div>مدير المدرسة<br><br>____________________<br>التوقيع والختم</div></div>
+    <div style="margin-top:70px;display:flex;justify-content:space-around;text-align:center"><div>معلم المادة<br><b>كرار علي كامل</b><br>____________________<br>التوقيع</div><div>مدير المدرسة<br><b>سعود محسن احمد</b><br>____________________<br>التوقيع والختم</div></div>
   </div>`;
   window.print();
 }
@@ -492,7 +492,7 @@ function exportExcel(){
     const d=ensureStudentData(s.id),r={'ت':i+1,'اسم الطالب':s.name};
     d.weeks.forEach((w,wi)=>r[`${WEEKS[wi]} (٢٠)`]=w.score);
     r['دفتر + سلوك + نشاط (٢٠)']=d.notebookBehaviorActivity;
-    r['المجموع المستمر (١٠٠)']=continuousTotal(d);
+    r['المجموع الشفوي (١٠٠)']=continuousTotal(d);
     r['الامتحان الشهري (١٠٠)']=d.monthlyExam;
     r['الدرجة النهائية (المجموع ÷ ٢)']=finalGrade(d);
     r['التقييم العام']=d.overall||'';
