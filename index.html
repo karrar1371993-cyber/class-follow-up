@@ -442,10 +442,7 @@ function studentMonthData(id,month,section){
   const md=getMonthDataFor(month,section);
   return md[id] || {shortTests:0,dailyPrep:0,homework:0,notebook:0,absence:0,behavior:0,monthlyExam:0};
 }
-function hasCompleteScores(d){
-  const isEntered=v => v!=='' && v!==null && v!==undefined && Number.isFinite(Number(v));
-  return CATEGORIES.every(([key])=>isEntered(d[key])) && isEntered(d.monthlyExam);
-}
+function hasCompleteScores(d){return CATEGORIES.every(([key])=>Number(d[key]||0)>0) && Number(d.monthlyExam||0)>0;}
 function renderTable(){
   renderHeader();
   const q=($('search').value||'').trim().toLowerCase();
@@ -562,7 +559,55 @@ function openClassReport(){
   const top=[...students].sort((a,b)=>finalGrade(ensureStudentData(b.id))-finalGrade(ensureStudentData(a.id))).slice(0,10);
   const box=document.createElement('div'); box.id='classReportTemp'; box.className='fixed inset-0 modal-backdrop z-[120] flex items-center justify-center p-4'; box.innerHTML=`<div class="modal bg-white w-full max-w-4xl max-h-[90vh] overflow-auto rounded-2xl shadow-2xl"><div class="p-5 border-b flex justify-between items-center"><div><h2 class="text-xl font-extrabold">تقرير الشعبة</h2><p class="text-sm text-slate-500">${escapeHtml(state.settings.school||'المدرسة')} — ${escapeHtml(state.settings.className||'الصف')} — الشعبة ${state.settings.section||'أ'} — ${state.settings.month}</p></div><button type="button" onclick="document.getElementById('classReportTemp')?.remove()" class="text-slate-400 text-xl"><i class="fa-solid fa-xmark"></i></button></div><div class="p-5"><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"><div class="bg-slate-50 p-3 rounded-xl">عدد التلاميذ<br><b>${students.length}</b></div><div class="bg-slate-50 p-3 rounded-xl">المكتملة<br><b>${completed.length}</b></div><div class="bg-slate-50 p-3 rounded-xl">معدل الشعبة<br><b>${avg||'—'}</b></div><div class="bg-slate-50 p-3 rounded-xl">درجات ناقصة<br><b>${students.length-completed.length}</b></div></div><div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-5">${Object.entries(counts).map(([k,v])=>`<div class="border rounded-xl p-3 text-center"><div class="text-xs text-slate-500">${k}</div><b>${v}</b></div>`).join('')}</div><h3 class="font-extrabold mb-2">الترتيب الحالي</h3><div class="overflow-auto border rounded-xl"><table class="w-full text-sm"><thead class="bg-slate-50"><tr><th class="p-2">الترتيب</th><th class="p-2 text-right">التلميذ</th><th class="p-2">الدرجة</th><th class="p-2">التقييم</th></tr></thead><tbody>${top.map((s,i)=>{const f=finalGrade(ensureStudentData(s.id));return `<tr class="border-t"><td class="p-2 text-center">${i+1}</td><td class="p-2 font-bold">${escapeHtml(s.name)}</td><td class="p-2 text-center">${fmt(f)}</td><td class="p-2 text-center">${automaticEvaluation(f)}</td></tr>`}).join('')}</tbody></table></div></div><div class="p-5 border-t flex justify-end"><button type="button" onclick="printClassReport()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold"><i class="fa-solid fa-print ml-1"></i> طباعة التقرير</button></div></div>`; document.body.appendChild(box);
 }
-function printClassReport(){const students=getCurrentSectionStudents().sort((a,b)=>finalGrade(ensureStudentData(b.id))-finalGrade(ensureStudentData(a.id))); const rows=students.map((s,i)=>{const d=ensureStudentData(s.id),f=finalGrade(d);return `<tr><td>${i+1}</td><td>${escapeHtml(s.name)}</td><td>${continuousTotal(d)}</td><td>${d.monthlyExam}</td><td>${f}</td><td>${automaticEvaluation(f)}</td></tr>`}).join(''); const w=window.open('','_blank'); if(!w)return; w.document.write(`<html dir="rtl"><head><meta charset="utf-8"><title>تقرير الشعبة</title><style>body{font-family:Arial;padding:25px}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #999;padding:7px;text-align:center}th{background:#eee}</style></head><body><h1>تقرير الشعبة</h1><h2>${escapeHtml(state.settings.school||'المدرسة')}</h2><p style="text-align:center">${escapeHtml(state.settings.className||'الصف')} — الشعبة ${state.settings.section||'أ'} — ${escapeHtml(state.settings.subject)} — ${escapeHtml(state.settings.month)}</p><table><tr><th>الترتيب</th><th>اسم التلميذ</th><th>المجموع الشفوي</th><th>الامتحان الشهري</th><th>الدرجة النهائية</th><th>التقييم</th></tr>${rows}</table><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();}
+function printClassReport(){
+  const students=getCurrentSectionStudents();
+  const completed=students.filter(s=>hasCompleteScores(ensureStudentData(s.id)));
+  const finals=completed.map(s=>finalGrade(ensureStudentData(s.id)));
+  const avg=finals.length?Math.round(finals.reduce((a,b)=>a+b,0)/finals.length):0;
+  const highest=finals.length?Math.max(...finals):0;
+  const lowest=finals.length?Math.min(...finals):0;
+  const counts={'ممتاز':0,'جيد جداً':0,'جيد':0,'متوسط':0,'مقبول':0,'ضعيف':0};
+  completed.forEach(s=>counts[automaticEvaluation(finalGrade(ensureStudentData(s.id)))]++);
+  const ordered=[...students].sort((a,b)=>finalGrade(ensureStudentData(b.id))-finalGrade(ensureStudentData(a.id)));
+  const rows=ordered.map((s,i)=>{
+    const d=ensureStudentData(s.id), f=finalGrade(d), complete=hasCompleteScores(d);
+    return `<tr><td>${i+1}</td><td class="name">${escapeHtml(s.name)}</td>${CATEGORIES.map(([key,label,max])=>`<td>${d[key]} / ${max}</td>`).join('')}<td><b>${continuousTotal(d)} / 100</b></td><td>${d.monthlyExam} / 100</td><td><b>${fmt(f)} / 100</b></td><td>${complete?automaticEvaluation(f):'بيانات ناقصة'}</td></tr>`;
+  }).join('');
+  const summary=`<div class="summary-grid">
+    <div><span>عدد التلاميذ</span><b>${students.length}</b></div>
+    <div><span>الدرجات المكتملة</span><b>${completed.length}</b></div>
+    <div><span>معدل الشعبة</span><b>${avg||'—'}</b></div>
+    <div><span>أعلى درجة</span><b>${highest||'—'}</b></div>
+    <div><span>أدنى درجة</span><b>${lowest||'—'}</b></div>
+    <div><span>ممتاز</span><b>${counts['ممتاز']}</b></div>
+    <div><span>جيد جداً</span><b>${counts['جيد جداً']}</b></div>
+    <div><span>جيد</span><b>${counts['جيد']}</b></div>
+    <div><span>متوسط</span><b>${counts['متوسط']}</b></div>
+    <div><span>مقبول</span><b>${counts['مقبول']}</b></div>
+    <div><span>ضعيف</span><b>${counts['ضعيف']}</b></div>
+    <div><span>بيانات ناقصة</span><b>${students.length-completed.length}</b></div>
+  </div>`;
+  const w=window.open('','_blank'); if(!w)return;
+  w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير الشعبة</title><style>
+    @page{size:A4 landscape;margin:12mm}
+    *{box-sizing:border-box}body{font-family:Cairo,Arial,sans-serif;color:#111;margin:0;font-size:11px}
+    .header{display:grid;grid-template-columns:90px 1fr 90px;direction:ltr;align-items:center;gap:18px;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:14px}
+    .logo{width:82px;height:82px;object-fit:contain}.center{direction:rtl;text-align:center;line-height:1.65}.center .main{font-size:16px;font-weight:800}.center .sub{font-size:12px}.title{text-align:center;font-size:18px;font-weight:800;margin:8px 0 14px}
+    .info{width:100%;border-collapse:collapse;margin-bottom:12px}.info td{border:1px solid #aaa;padding:7px}.info b{margin-left:4px}
+    .summary-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:8px 0 14px}.summary-grid div{border:1px solid #bbb;background:#f7f7f7;border-radius:5px;padding:5px;text-align:center}.summary-grid span{display:block;font-size:9px;color:#555}.summary-grid b{display:block;font-size:13px;margin-top:2px}
+    table.main{width:100%;border-collapse:collapse;text-align:center;font-size:9px}table.main th,table.main td{border:1px solid #999;padding:5px;vertical-align:middle}table.main th{background:#eee;font-weight:800}table.main .name{text-align:right;white-space:nowrap;font-weight:700}
+    .sign{margin-top:28px;display:flex;justify-content:space-around;text-align:center;font-size:11px}.sign div{min-width:220px}.note{margin-top:10px;color:#666;font-size:9px;text-align:center}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}}
+  </style></head><body>
+    <div class="header"><div><img class="logo" src="${school_img}" alt="شعار المدرسة"></div><div class="center"><div class="main">جمهورية العراق</div><div class="main">وزارة التربية</div><div class="sub">المديرية العامة لتربية ذي قار</div><div class="sub">قسم تربية الشطرة</div><div class="sub">${escapeHtml(state.settings.school||'مدرسة النقاء الابتدائية المختلطة')}</div></div><div><img class="logo" src="${min_img}" alt="شعار وزارة التربية"></div></div>
+    <div class="title">تقرير متابعة الشعبة</div>
+    <table class="info"><tr><td><b>الصف:</b> ${escapeHtml(state.settings.className||'')}</td><td><b>الشعبة:</b> ${escapeHtml(state.settings.section||'أ')}</td><td><b>المادة:</b> ${escapeHtml(state.settings.subject||'')}</td></tr><tr><td><b>الشهر:</b> ${escapeHtml(state.settings.month||'')}</td><td><b>العام الدراسي:</b> ٢٠٢٦ - ٢٠٢٧</td><td><b>المعلم:</b> كرار علي كامل</td></tr></table>
+    ${summary}
+    <table class="main"><thead><tr><th>ت</th><th>اسم التلميذ</th>${CATEGORIES.map(([key,label,max])=>`<th>${label}<br>/${max}</th>`).join('')}<th>المجموع الشفوي<br>/ 100</th><th>الامتحان الشهري<br>/ 100</th><th>الدرجة النهائية<br>/ 100</th><th>التقييم</th></tr></thead><tbody>${rows||'<tr><td colspan="13" style="padding:18px">لا توجد بيانات.</td></tr>'}</tbody></table>
+    <div class="note">الدرجة النهائية = جبر ((المجموع الشفوي + الامتحان الشهري) ÷ ٢)، والتقييم محسوب تلقائياً وفق الدرجة النهائية.</div>
+    <div class="sign"><div>معلم المادة<br><b>كرار علي كامل</b><br>____________________<br>التوقيع</div><div>مدير المدرسة<br><b>سعود محسن احمد</b><br>____________________<br>التوقيع والختم</div></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+}
 
 function resetStudentMonth(id){
   const s=state.students.find(x=>x.id===id);if(!s)return;
