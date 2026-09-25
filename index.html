@@ -25,6 +25,8 @@
     .score-input{width:64px}
     .print-only{display:none}
     .mobile-student-card{display:none}
+    .stat-card{transition:transform .15s ease,box-shadow .15s ease}.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,23,42,.08)}
+    .backup-input{display:none}
     @media(max-width:767px){
       .desktop-table{display:none!important}
       .mobile-student-card{display:block}
@@ -85,12 +87,26 @@
           <button type="button" onclick="openRandomPicker()" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 rounded-xl font-bold">
             <i class="fa-solid fa-dharmachakra ml-1"></i> اختيار عشوائي
           </button>
+          <button type="button" onclick="backupData()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold">
+            <i class="fa-solid fa-download ml-1"></i> نسخ احتياطي
+          </button>
+          <button type="button" onclick="document.getElementById('restoreFile').click()" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl font-bold">
+            <i class="fa-solid fa-upload ml-1"></i> استعادة
+          </button>
+          <input id="restoreFile" class="backup-input" type="file" accept=".json" onchange="restoreData(event)">
         </div>
         <div class="relative w-full lg:w-96">
           <i class="fa-solid fa-magnifying-glass absolute right-4 top-3.5 text-slate-400"></i>
           <input id="search" oninput="renderTable()" class="w-full border border-slate-300 rounded-xl pr-11 pl-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="ابحث باسم الطالب...">
         </div>
       </div>
+    </div>
+
+    <div id="statsGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">عدد التلاميذ</div><div id="statStudents" class="text-2xl font-extrabold mt-1">٠</div></div><i class="fa-solid fa-users text-sky-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">الدرجات المكتملة</div><div id="statCompleted" class="text-2xl font-extrabold mt-1">٠</div></div><i class="fa-solid fa-clipboard-check text-emerald-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">متوسط الدرجة النهائية</div><div id="statAverage" class="text-2xl font-extrabold mt-1">—</div></div><i class="fa-solid fa-chart-line text-violet-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">أعلى درجة نهائية</div><div id="statHighest" class="text-2xl font-extrabold mt-1">—</div></div><i class="fa-solid fa-star text-amber-500 text-xl"></i></div></div>
     </div>
 
     <div id="emptyState" class="hidden bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center">
@@ -110,6 +126,7 @@
     <div class="mt-4 text-xs text-slate-500 flex flex-wrap gap-x-5 gap-y-2">
       <span><i class="fa-solid fa-floppy-disk ml-1"></i> الحفظ تلقائي في المتصفح.</span>
       <span><i class="fa-solid fa-circle-info ml-1"></i> التوزيع: ٤ أسابيع × ٢٠ = ٨٠، ودفتر + سلوك + نشاط = ٢٠، المجموع الشفوي = ١٠٠، والدرجة النهائية = (المجموع الشفوي + الامتحان الشهري) ÷ ٢.</span>
+      <span><i class="fa-solid fa-shield-halved ml-1"></i> يُنصح بتنزيل نسخة احتياطية دورية.</span>
       <span id="saveStatus"></span>
     </div>
   </main>
@@ -365,6 +382,7 @@ function renderDesktopRow(s,index){
     <td class="sticky-actions px-2 py-2 text-center border-r border-slate-200">
       <div class="flex gap-1 justify-center">
         <button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-chart-column ml-1"></i>درجات</button>
+        <button type="button" onclick="resetStudentMonth('${s.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-left ml-1"></i>تصفير</button>
         <button type="button" onclick="deleteStudent('${s.id}')" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-trash ml-1"></i>حذف</button>
       </div>
     </td>
@@ -392,9 +410,12 @@ function renderMobileCard(s,index){
         <option value="">اختر التقييم</option>${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}
       </select>
     </label>
-    <button type="button" onclick="openReport('${s.id}')" class="w-full mt-4 bg-sky-600 hover:bg-sky-700 text-white py-3 rounded-xl font-bold">
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button type="button" onclick="resetStudentMonth('${s.id}')" class="border border-amber-300 text-amber-700 py-2 rounded-xl font-bold"><i class="fa-solid fa-rotate-left ml-1"></i>تصفير درجات الشهر</button>
+      <button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 hover:bg-sky-700 text-white py-2 rounded-xl font-bold">
       <i class="fa-solid fa-chart-column ml-1"></i> فتح سجل درجات الطالب
-    </button>
+      </button>
+    </div>
   </article>`;
 }
 
@@ -408,6 +429,51 @@ function renderTable(){
   $('mobileStudents').classList.toggle('hidden',list.length===0);
   $('tableBody').innerHTML=list.map(renderDesktopRow).join('')||`<tr><td colspan="20" class="text-center p-8 text-slate-500">لا توجد نتائج مطابقة للبحث.</td></tr>`;
   $('mobileStudents').innerHTML=list.map(renderMobileCard).join('');
+  renderStats();
+}
+
+function renderStats(){
+  const students=state.students||[];
+  const data=students.map(s=>ensureStudentData(s.id));
+  const finals=data.map(finalGrade);
+  const completed=data.filter(d=>d.weeks.every(w=>Number(w.score||0)>0)&&Number(d.notebookBehaviorActivity||0)>0&&Number(d.monthlyExam||0)>0).length;
+  const avg=finals.length?finals.reduce((a,b)=>a+b,0)/finals.length:0;
+  const high=finals.length?Math.max(...finals):0;
+  $('statStudents').textContent=students.length.toLocaleString('ar-IQ');
+  $('statCompleted').textContent=completed.toLocaleString('ar-IQ');
+  $('statAverage').textContent=finals.length?fmt(avg):'—';
+  $('statHighest').textContent=finals.length?fmt(high):'—';
+}
+
+function resetStudentMonth(id){
+  const s=state.students.find(x=>x.id===id);if(!s)return;
+  if(!confirm(`سيتم تصفير درجات الطالب "${s.name}" في شهر ${state.settings.month} فقط. هل تريد المتابعة؟`))return;
+  const md=monthData(); delete md[id]; saveState(); renderTable();
+  if(currentReportId===id && !$('reportModal').classList.contains('hidden')) openReport(id);
+}
+
+function backupData(){
+  const payload={version:3,exportedAt:new Date().toISOString(),app:'سجل متابعة صفية شهري متقدم',state};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`نسخة احتياطية - سجل المتابعة - ${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function restoreData(e){
+  const file=e.target.files?.[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const payload=JSON.parse(ev.target.result);
+      const incoming=payload.state||payload;
+      if(!incoming || !Array.isArray(incoming.students) || typeof incoming.months!=='object')throw new Error('invalid');
+      if(!confirm('سيتم استبدال بيانات السجل الحالية بالنسخة الاحتياطية. هل تريد المتابعة؟'))return;
+      state={settings:{...state.settings,...incoming.settings},students:incoming.students,months:incoming.months||{}};
+      migrateStudents();saveState();
+      $('schoolName').value=state.settings.school||'';$('className').value=state.settings.className||'';$('subject').value=state.settings.subject||'الرياضيات';$('month').value=state.settings.month||MONTHS[0];
+      renderTable();alert('تمت استعادة النسخة الاحتياطية بنجاح.');
+    }catch(err){alert('ملف النسخة الاحتياطية غير صالح أو غير متوافق.');}
+  };
+  reader.readAsText(file);e.target.value='';
 }
 
 function deleteStudent(id){
