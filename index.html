@@ -329,6 +329,7 @@ function importStudentsFile(e){
 
 function continuousTotal(data){return CATEGORIES.reduce((sum,[key,,max])=>sum+Math.min(max,Number(data[key]||0)),0)}
 function finalGrade(data){return (continuousTotal(data)+Number(data.monthlyExam||0))/2}
+function automaticEvaluation(final){const n=Number(final||0);if(n<50)return 'ضعيف';if(n<60)return 'مقبول';if(n<70)return 'متوسط';if(n<80)return 'جيد';if(n<90)return 'جيد جداً';return 'ممتاز'}
 function fmt(n){return Number.isInteger(Number(n))?Number(n):Number(n).toFixed(1)}
 function setCategoryScore(id,key,value){
   const d=ensureStudentData(id);
@@ -342,7 +343,6 @@ function setMonthlyExam(id,value){
   d.monthlyExam=Math.max(0,Math.min(100,Number(value)||0));
   saveState();renderTable();
 }
-function setOverall(id,value){ensureStudentData(id).overall=value;saveState();renderTable()}
 
 function renderHeader(){
   $('mainTable').querySelector('thead').innerHTML=`<tr>
@@ -368,10 +368,7 @@ function renderDesktopRow(s,index){
     <td class="px-3 py-3 text-center font-extrabold">${cont} / 100</td>
     <td class="px-2 py-2 border-r border-slate-200 text-center"><input type="number" inputmode="numeric" min="0" max="100" value="${exam}" onchange="setMonthlyExam('${s.id}',this.value)" class="score-input border rounded-lg text-center py-1.5"></td>
     <td class="px-3 py-3 text-center font-extrabold">${fmt(final)} / 100</td>
-    <td class="px-3 py-3 text-center"><select onchange="setOverall('${s.id}',this.value)" class="border rounded-lg px-2 py-1.5">
-      <option value="" ${!d.overall?'selected':''}>اختر</option>
-      ${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}
-    </select></td>
+    <td class="px-3 py-3 text-center font-bold">${automaticEvaluation(final)}</td>
     <td class="sticky-actions px-2 py-2 text-center border-r border-slate-200">
       <div class="flex gap-1 justify-center flex-wrap">
         <button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-chart-column ml-1"></i>درجات</button>
@@ -391,7 +388,7 @@ function renderMobileCard(s,index){
       <label class="block"><span class="text-xs font-bold text-slate-600">الامتحان الشهري / ١٠٠</span><input type="number" inputmode="numeric" min="0" max="100" value="${Number(d.monthlyExam)||0}" onchange="setMonthlyExam('${s.id}',this.value)" class="mobile-score border rounded-lg text-center py-2 w-full"></label>
     </div>
     <div class="grid grid-cols-2 gap-2 mt-4 text-center"><div class="bg-slate-50 rounded-xl p-2"><div class="text-xs text-slate-500">المجموع الشفوي</div><b>${cont} / 100</b></div><div class="bg-slate-50 rounded-xl p-2"><div class="text-xs text-slate-500">الدرجة النهائية</div><b>${fmt(final)} / 100</b></div></div>
-    <label class="block mt-3"><span class="text-xs font-bold text-slate-600">التقييم العام</span><select onchange="setOverall('${s.id}',this.value)" class="w-full border rounded-lg px-3 py-2 mt-1"><option value="">اختر التقييم</option>${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    <div class="mt-3"><span class="text-xs font-bold text-slate-600">التقييم العام</span><div class="w-full bg-slate-50 border rounded-lg px-3 py-2 mt-1 font-bold">${automaticEvaluation(final)}</div></div>
     <div class="grid grid-cols-2 gap-2 mt-3"><button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 text-white py-2 rounded-xl font-bold"><i class="fa-solid fa-chart-column ml-1"></i>فتح السجل</button></div>
   </article>`;
 }
@@ -451,18 +448,17 @@ function openReport(id){
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">المجموع الشفوي</div><div class="text-2xl font-extrabold">${continuousTotal(d)} / 100</div></div>
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الامتحان الشهري</div><div class="text-2xl font-extrabold">${d.monthlyExam} / 100</div></div>
       <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الدرجة النهائية</div><div class="text-2xl font-extrabold">${fmt(finalGrade(d))} / 100</div></div>
-      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">التقييم</div><div class="font-bold mt-1">${d.overall||'غير محدد'}</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">التقييم</div><div class="font-bold mt-1">${automaticEvaluation(finalGrade(d))}</div></div>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
       ${CATEGORIES.map(([key,label,max])=>`<label class="block"><span class="font-bold block mb-2">${label} (${max})</span><input type="number" inputmode="numeric" min="0" max="${max}" value="${d[key]}" onchange="setCategoryScore('${s.id}','${key}',this.value);openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5"></label>`).join('')}
       <label class="block"><span class="font-bold block mb-2">الامتحان الشهري (١٠٠)</span><input type="number" inputmode="numeric" min="0" max="100" value="${d.monthlyExam}" onchange="setMonthlyExam('${s.id}',this.value);openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5"></label>
     </div>
-    <div class="mt-5"><label class="font-bold block mb-2">التقييم العام</label><select onchange="setOverallFromReport(this.value)" class="border rounded-xl px-4 py-2.5 w-full"><option value="">اختر التقييم</option>${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="mt-5"><label class="font-bold block mb-2">التقييم العام</label><div class="border rounded-xl px-4 py-2.5 w-full bg-slate-50 font-bold">${automaticEvaluation(finalGrade(d))}</div></div>
     <div class="flex flex-wrap justify-end gap-2 mt-5"><button type="button" onclick="printStudentReport()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold"><i class="fa-solid fa-print ml-1"></i> طباعة تقرير A4</button><button type="button" onclick="closeModal('reportModal')" class="border px-5 py-2.5 rounded-xl">إغلاق</button></div>`;
   openModal('reportModal');
 }
 
-function setOverallFromReport(value){if(!currentReportId)return;ensureStudentData(currentReportId).overall=value;saveState();openReport(currentReportId)}
 
 function printStudentReport(){
   const s=state.students.find(x=>x.id===currentReportId);if(!s)return;
@@ -487,7 +483,7 @@ function printStudentReport(){
       <tr><td style="border:1px solid #aaa;padding:8px"><b>المجموع الشفوي</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${continuousTotal(d)} / 100</b></td></tr>
       <tr><td style="border:1px solid #aaa;padding:8px">الامتحان الشهري</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.monthlyExam} / 100</td></tr>
       <tr><td style="border:1px solid #aaa;padding:8px"><b>الدرجة النهائية</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${fmt(finalGrade(d))} / 100</b></td></tr>
-      <tr><td style="border:1px solid #aaa;padding:8px">التقييم العام</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${escapeHtml(d.overall||'غير محدد')}</td></tr>
+      <tr><td style="border:1px solid #aaa;padding:8px">التقييم العام</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${escapeHtml(automaticEvaluation(finalGrade(d)))}</td></tr>
     </table>
     <div style="margin-top:70px;display:flex;justify-content:space-around;text-align:center"><div>معلم المادة<br><b>كرار علي كامل</b><br>____________________<br>التوقيع</div><div>مدير المدرسة<br><b>سعود محسن احمد</b><br>____________________<br>التوقيع والختم</div></div>
   </div>`;
@@ -506,7 +502,7 @@ function exportExcel(){
     r['المجموع الشفوي (١٠٠)']=continuousTotal(d);
     r['الامتحان الشهري (١٠٠)']=d.monthlyExam;
     r['الدرجة النهائية (المجموع ÷ ٢)']=finalGrade(d);
-    r['التقييم العام']=d.overall||'';
+    r['التقييم العام']=automaticEvaluation(finalGrade(d));
     return r;
   });
   const ws=XLSX.utils.json_to_sheet(rows);
