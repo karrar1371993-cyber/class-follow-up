@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>سجل متابعة صفية شهري متقدم</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { cairo: ['Cairo','sans-serif'] } } } };
+  </script>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Cairo',sans-serif;background:#f1f5f9}
+    button,input,select,textarea{font-family:inherit}
+    .modal-backdrop{background:rgba(15,23,42,.58);backdrop-filter:blur(3px)}
+    .modal{max-height:92vh;overflow:auto}
+    .sticky-name{position:sticky;right:0;z-index:20;background:#fff}
+    .sticky-actions{position:sticky;left:0;z-index:20;background:#fff}
+    thead .sticky-name,thead .sticky-actions{z-index:40;background:#0f172a;color:#fff}
+    .score-input{width:64px}
+    .print-only{display:none}
+    .mobile-student-card{display:none}
+    .stat-card{transition:transform .15s ease,box-shadow .15s ease}.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,23,42,.08)}
+    .backup-input{display:none}
+    @media(max-width:767px){
+      .desktop-table{display:none!important}
+      .mobile-student-card{display:block}
+      .mobile-score{width:100%;min-width:0}
+    }
+    @media print{
+      @page{size:A4 portrait;margin:12mm}
+      body{background:#fff!important}
+      body>*:not(#printReport){display:none!important}
+      #printReport{display:block!important}
+      .no-print{display:none!important}
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+<div id="app" class="min-h-screen">
+  <header class="bg-slate-900 text-white shadow-lg">
+    <div class="max-w-[1800px] mx-auto px-4 py-4">
+      <div class="flex flex-col xl:flex-row gap-4 items-stretch xl:items-end">
+        <div class="flex-1">
+          <label class="block text-xs text-slate-300 mb-1">اسم المدرسة</label>
+          <input id="schoolName" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="اكتب اسم المدرسة">
+        </div>
+        <div class="w-full xl:w-60">
+          <label class="block text-xs text-slate-300 mb-1">الصف والشعبة</label>
+          <input id="className" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="مثال: السادس / أ">
+        </div>
+        <div class="w-full xl:w-48">
+          <label class="block text-xs text-slate-300 mb-1">المادة الدراسية</label>
+          <select id="subject" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none">
+            <option>الرياضيات</option><option>اللغة العربية</option><option>اللغة الإنكليزية</option>
+            <option>العلوم</option><option>الاجتماعيات</option><option>التربية الإسلامية</option><option>أخرى</option>
+          </select>
+        </div>
+        <div class="w-full xl:w-44">
+          <label class="block text-xs text-slate-300 mb-1">الشهر</label>
+          <select id="month" class="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 outline-none"></select>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="exportExcel()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap">
+            <i class="fa-solid fa-file-excel ml-1"></i> تصدير Excel
+          </button>
+          <button type="button" onclick="clearMonth()" class="flex-1 bg-rose-600 hover:bg-rose-700 px-4 py-2.5 rounded-xl font-bold whitespace-nowrap">
+            <i class="fa-solid fa-trash-can ml-1"></i> مسح الشهر
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1800px] mx-auto p-4">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-4">
+      <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+        <div class="flex gap-2 flex-wrap">
+          <button type="button" onclick="openStudentsModal()" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2.5 rounded-xl font-bold">
+            <i class="fa-solid fa-users-gear ml-1"></i> إدارة الطلاب
+          </button>
+        </div>
+        <div class="relative w-full lg:w-96">
+          <i class="fa-solid fa-magnifying-glass absolute right-4 top-3.5 text-slate-400"></i>
+          <input id="search" oninput="renderTable()" class="w-full border border-slate-300 rounded-xl pr-11 pl-4 py-2.5 outline-none focus:ring-2 focus:ring-sky-500" placeholder="ابحث باسم الطالب...">
+        </div>
+      </div>
+    </div>
+
+    <div id="statsGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">عدد التلاميذ</div><div id="statStudents" class="text-2xl font-extrabold mt-1">٠</div></div><i class="fa-solid fa-users text-sky-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">الدرجات المكتملة</div><div id="statCompleted" class="text-2xl font-extrabold mt-1">٠</div></div><i class="fa-solid fa-clipboard-check text-emerald-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">متوسط الدرجة النهائية</div><div id="statAverage" class="text-2xl font-extrabold mt-1">—</div></div><i class="fa-solid fa-chart-line text-violet-500 text-xl"></i></div></div>
+      <div class="stat-card bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"><div class="flex items-center justify-between"><div><div class="text-xs text-slate-500">أعلى درجة نهائية</div><div id="statHighest" class="text-2xl font-extrabold mt-1">—</div></div><i class="fa-solid fa-star text-amber-500 text-xl"></i></div></div>
+    </div>
+
+    <div id="emptyState" class="hidden bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center">
+      <i class="fa-solid fa-user-plus text-5xl text-slate-300 mb-4"></i>
+      <h2 class="text-xl font-bold mb-2">لا يوجد طلاب حتى الآن</h2>
+      <p class="text-slate-500 mb-5">ابدأ بإضافة الطلاب أو استيرادهم من ملف.</p>
+      <button type="button" onclick="openStudentsModal()" class="bg-sky-600 text-white px-5 py-2.5 rounded-xl font-bold">إدارة الطلاب</button>
+    </div>
+
+    <div id="tableWrap" class="desktop-table hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-auto">
+      <table id="mainTable" class="border-collapse min-w-[1700px] w-full text-sm">
+        <thead></thead><tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div id="mobileStudents" class="mobile-student-card hidden space-y-3"></div>
+
+    <div class="mt-4 text-xs text-slate-500 flex flex-wrap gap-x-5 gap-y-2">
+      <span><i class="fa-solid fa-floppy-disk ml-1"></i> الحفظ تلقائي في المتصفح.</span>
+      <span><i class="fa-solid fa-circle-info ml-1"></i> توزيع المجموع الشفوي: الاختبارات القصيرة ٢٠، التحضير اليومي ٢٠، الواجب البيتي ٢٠، الدفتر المدرسي ٢٠، الغياب ١٠، السلوك ١٠ = ١٠٠. والدرجة النهائية = (المجموع الشفوي + الامتحان الشهري) ÷ ٢.</span>
+      <span id="saveStatus"></span>
+    </div>
+  </main>
+</div>
+
+<div id="studentsModal" class="hidden fixed inset-0 modal-backdrop z-[100] items-center justify-center p-4">
+  <div class="modal bg-white w-full max-w-3xl rounded-2xl shadow-2xl">
+    <div class="p-5 border-b flex justify-between items-center">
+      <div><h2 class="text-xl font-extrabold">إدارة الطلاب</h2><p class="text-sm text-slate-500 mt-1">ضع كل اسم في سطر مستقل. يمكن أيضًا استخدام الفواصل.</p></div>
+      <button type="button" onclick="closeModal('studentsModal')" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="p-5 space-y-4">
+      <input id="studentFile" type="file" accept=".xlsx,.xls,.csv,.docx,.doc" class="hidden" onchange="importStudentsFile(event)">
+      <button type="button" onclick="document.getElementById('studentFile').click()" class="w-full border-2 border-dashed border-sky-300 hover:border-sky-500 rounded-xl p-5 text-sky-700 font-bold">
+        <i class="fa-solid fa-file-import text-2xl mb-2 block"></i> استيراد من Excel / Word / CSV
+      </button>
+      <div>
+        <label class="font-bold block mb-2">قائمة الأسماء</label>
+        <textarea id="studentText" rows="12" class="w-full border rounded-xl p-4 outline-none focus:ring-2 focus:ring-sky-500" placeholder="اسم كل طالب في سطر مستقل..."></textarea>
+        <p class="text-xs text-slate-500 mt-2">يمكن لصق القائمة مباشرة من Excel أو Word، وسيتم تنظيف أرقام التسلسل والفواصل تلقائيًا.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-between">
+        <button type="button" onclick="document.getElementById('studentText').value=''" class="px-4 py-2.5 rounded-xl border border-slate-300">تفريغ الحقل</button>
+        <div class="flex gap-2">
+          <button type="button" onclick="saveStudents()" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl font-bold">حفظ الطلاب</button>
+          <button type="button" onclick="closeModal('studentsModal')" class="px-5 py-2.5 rounded-xl border">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="reportModal" class="hidden fixed inset-0 modal-backdrop z-[110] items-center justify-center p-4">
+  <div class="modal bg-white w-full max-w-3xl rounded-2xl shadow-2xl">
+    <div class="p-5 border-b flex justify-between items-center">
+      <div><h2 id="reportTitle" class="text-xl font-extrabold">تقرير الطالب</h2><p id="reportSubtitle" class="text-sm text-slate-500"></p></div>
+      <button type="button" onclick="closeModal('reportModal')" class="text-slate-400 hover:text-slate-700 text-xl"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="reportContent" class="p-5"></div>
+  </div>
+</div>
+
+<div id="qrModal" class="hidden fixed inset-0 modal-backdrop z-[130] items-center justify-center p-4">
+  <div class="modal bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 text-center">
+    <div class="flex justify-between items-center mb-4"><div class="text-right"><h2 class="text-xl font-extrabold">QR ولي الأمر</h2><p id="qrStudentName" class="text-sm text-slate-500"></p></div><button type="button" onclick="closeModal('qrModal')" class="text-slate-400 text-xl"><i class="fa-solid fa-xmark"></i></button></div>
+    <div id="qrBox" class="bg-white border rounded-2xl p-5 mx-auto w-fit"></div>
+    <p class="text-xs text-slate-500 mt-4">يمثل الرمز نسخة من درجات الطالب الحالية للأشهر الخمسة. عند تحديث الدرجات يُعاد إنشاء الرمز.</p>
+    <div class="flex gap-2 mt-4"><button type="button" onclick="printQr()" class="flex-1 bg-slate-900 text-white py-2.5 rounded-xl font-bold"><i class="fa-solid fa-print ml-1"></i>طباعة QR</button><button type="button" onclick="downloadQr()" class="flex-1 bg-violet-600 text-white py-2.5 rounded-xl font-bold"><i class="fa-solid fa-download ml-1"></i>حفظ الصورة</button></div>
+  </div>
+</div>
+
+<section id="printReport" class="print-only"></section>
+
+<script>
+const MONTHS=['تشرين الأول','تشرين الثاني','كانون الأول','آذار','نيسان'];
+const CATEGORIES=[['shortTests','الاختبارات القصيرة',20],['dailyPrep','التحضير اليومي',20],['homework','الواجب البيتي',20],['notebook','الدفتر المدرسي',20],['absence','الغياب',10],['behavior','السلوك',10]];
+const STORAGE_KEY='advancedClassRecord_v2';
+const LEGACY_STORAGE_KEY='advancedClassRecord_v1';
+let state={settings:{school:'',className:'',subject:'الرياضيات',month:'تشرين الأول'},students:[],months:{}};
+let currentReportId=null;
+const $=id=>document.getElementById(id);
+
+function defaultMonthData(){return{}}
+
+function normalizeStudentNames(input){
+  let text=String(input??'')
+    .replace(/\r\n?/g,'\n')
+    .replace(/\\r?\\n/g,'\n')
+    .replace(/\u00a0/g,' ')
+    .trim();
+  if(!text)return[];
+
+  // If copied as "1.1. الاسم الأول 2. الاسم الثاني" or similar, split before numbered entries.
+  let chunks=text.split(/\s+(?=\d+\s*[.)-]\s+)/);
+  if(chunks.length===1) chunks=text.split(/\n+/);
+  else chunks=chunks.flatMap(x=>x.split(/\n+/));
+
+  const out=[];
+  for(let chunk of chunks){
+    chunk=chunk.trim();
+    if(!chunk)continue;
+    const parts=chunk.split(/[،,؛;|\t]+/).map(x=>x.trim()).filter(Boolean);
+    for(let part of parts){
+      part=part.replace(/^\s*(?:(?:الطالب\s*)?\d+\s*[.)-]\s*)+/i,'').trim();
+      part=part.replace(/^[-–—•*]+\s*/,'').trim();
+      if(part)out.push(part);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function migrateStudents(){
+  let changed=false;
+  const normalized=[];
+  for(const s of state.students||[]){
+    const names=normalizeStudentNames(s.name);
+    if(names.length===1 && names[0]===s.name){normalized.push(s);continue;}
+    if(names.length===0)continue;
+    changed=true;
+    names.forEach(name=>{
+      const existing=state.students.find(x=>x.name===name);
+      normalized.push(existing||{id:crypto.randomUUID(),name});
+    });
+  }
+  if(changed)state.students=normalized;
+  return changed;
+}
+
+function loadState(){
+  try{
+    let raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)raw=localStorage.getItem(LEGACY_STORAGE_KEY);
+    if(raw)state={...state,...JSON.parse(raw)};
+  }catch(e){}
+  if(!state.months)state.months={};
+  if(!Array.isArray(state.students))state.students=[];
+  const migrated=migrateStudents();
+  if(migrated) setTimeout(saveState,0);
+}
+
+function currentKey(){return `${state.settings.subject}__${state.settings.month}`}
+
+function monthData(){
+  const key=currentKey();
+  if(!state.months[key])state.months[key]={};
+  return state.months[key];
+}
+
+function ensureStudentData(id){
+  const md=monthData();
+  if(!md[id])md[id]={shortTests:0,dailyPrep:0,homework:0,notebook:0,absence:0,behavior:0,monthlyExam:0,overall:''};
+  // Preserve any legacy fields so existing data is not deleted. New fields start at zero.
+  CATEGORIES.forEach(([key])=>{md[id][key]=Math.max(0,Number(md[id][key]||0));});
+  return md[id];
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  const status=$('saveStatus');
+  if(status)status.textContent='آخر حفظ: '+new Date().toLocaleTimeString('ar-IQ');
+}
+
+function setup(){
+  MONTHS.forEach(m=>$('month').insertAdjacentHTML('beforeend',`<option>${m}</option>`));
+  loadState();
+  $('schoolName').value=state.settings.school||'';
+  $('className').value=state.settings.className||'';
+  $('subject').value=state.settings.subject||'الرياضيات';
+  $('month').value=state.settings.month||'تشرين الأول';
+
+  ['schoolName','className'].forEach(id=>$(id).addEventListener('input',()=>{
+    state.settings[id==='schoolName'?'school':'className']=$(id).value;saveState();
+  }));
+  $('subject').addEventListener('change',()=>{state.settings.subject=$('subject').value;saveState();renderTable()});
+  $('month').addEventListener('change',()=>{state.settings.month=$('month').value;saveState();renderTable()});
+  renderTable();
+  openParentFromHash();
+}
+
+function openModal(id){$(id).classList.remove('hidden');$(id).classList.add('flex')}
+function closeModal(id){$(id).classList.add('hidden');$(id).classList.remove('flex')}
+
+function openStudentsModal(){
+  $('studentText').value=state.students.map(s=>s.name).join('\n');
+  openModal('studentsModal');
+}
+
+function saveStudents(){
+  const names=normalizeStudentNames($('studentText').value);
+  const old=new Map(state.students.map(s=>[s.name,s]));
+  state.students=names.map(name=>old.get(name)||{id:crypto.randomUUID(),name});
+  saveState();closeModal('studentsModal');renderTable();
+}
+
+function importStudentsFile(e){
+  const file=e.target.files?.[0];
+  if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  if(['xlsx','xls','csv'].includes(ext)){
+    reader.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+        $('studentText').value=normalizeStudentNames(rows.flat().map(v=>String(v)).join('\n')).join('\n');
+      }catch(err){alert('تعذر قراءة ملف Excel.')}
+    };
+    reader.readAsArrayBuffer(file);
+  }else{
+    reader.onload=ev=>{
+      let text=ev.target.result;
+      text=text.replace(/<[^>]+>/g,'\n').replace(/&nbsp;/g,' ');
+      $('studentText').value=normalizeStudentNames(text).join('\n');
+    };
+    reader.readAsText(file);
+  }
+  e.target.value='';
+}
+
+function continuousTotal(data){return CATEGORIES.reduce((sum,[key,,max])=>sum+Math.min(max,Number(data[key]||0)),0)}
+function finalGrade(data){return (continuousTotal(data)+Number(data.monthlyExam||0))/2}
+function fmt(n){return Number.isInteger(Number(n))?Number(n):Number(n).toFixed(1)}
+function setCategoryScore(id,key,value){
+  const d=ensureStudentData(id);
+  const cat=CATEGORIES.find(x=>x[0]===key);
+  if(!cat)return;
+  d[key]=Math.max(0,Math.min(cat[2],Number(value)||0));
+  saveState();renderTable();
+}
+function setMonthlyExam(id,value){
+  const d=ensureStudentData(id);
+  d.monthlyExam=Math.max(0,Math.min(100,Number(value)||0));
+  saveState();renderTable();
+}
+function setOverall(id,value){ensureStudentData(id).overall=value;saveState();renderTable()}
+
+function renderHeader(){
+  $('mainTable').querySelector('thead').innerHTML=`<tr>
+    <th class="sticky-name px-3 py-3 border-b border-slate-700 text-right min-w-[220px]">اسم الطالب</th>
+    ${CATEGORIES.map(([k,label,max])=>`<th class="px-3 py-3 border-r border-slate-700 min-w-[125px]">${label}<br><span class="text-slate-300 text-xs">${max} درجة</span></th>`).join('')}
+    <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">المجموع الشفوي<br><span class="text-slate-300 text-xs">١٠٠</span></th>
+    <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الامتحان الشهري<br><span class="text-slate-300 text-xs">١٠٠</span></th>
+    <th class="px-3 py-3 border-r border-slate-700 min-w-[135px]">الدرجة النهائية<br><span class="text-slate-300 text-xs">(÷٢)</span></th>
+    <th class="px-3 py-3 border-r border-slate-700 min-w-[150px]">التقييم العام</th>
+    <th class="sticky-actions px-3 py-3 border-r border-slate-700 min-w-[210px]">الإجراءات</th>
+  </tr>`;
+}
+
+function scoreInput(id,key,value,max){
+  return `<input type="number" inputmode="numeric" min="0" max="${max}" value="${Number(value)||0}" onchange="setCategoryScore('${id}','${key}',this.value)" class="score-input border rounded-lg text-center py-1.5 focus:ring-2 focus:ring-sky-400">`;
+}
+
+function renderDesktopRow(s,index){
+  const d=ensureStudentData(s.id),cont=continuousTotal(d),exam=Number(d.monthlyExam||0),final=finalGrade(d);
+  return `<tr class="hover:bg-slate-50 border-b">
+    <td class="sticky-name px-3 py-3 font-bold border-l border-slate-200">${index+1}. ${escapeHtml(s.name)}</td>
+    ${CATEGORIES.map(([key,label,max])=>`<td class="px-2 py-2 border-r border-slate-200 text-center">${scoreInput(s.id,key,d[key],max)}</td>`).join('')}
+    <td class="px-3 py-3 text-center font-extrabold">${cont} / 100</td>
+    <td class="px-2 py-2 border-r border-slate-200 text-center"><input type="number" inputmode="numeric" min="0" max="100" value="${exam}" onchange="setMonthlyExam('${s.id}',this.value)" class="score-input border rounded-lg text-center py-1.5"></td>
+    <td class="px-3 py-3 text-center font-extrabold">${fmt(final)} / 100</td>
+    <td class="px-3 py-3 text-center"><select onchange="setOverall('${s.id}',this.value)" class="border rounded-lg px-2 py-1.5">
+      <option value="" ${!d.overall?'selected':''}>اختر</option>
+      ${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}
+    </select></td>
+    <td class="sticky-actions px-2 py-2 text-center border-r border-slate-200">
+      <div class="flex gap-1 justify-center flex-wrap">
+        <button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-chart-column ml-1"></i>درجات</button>
+        <button type="button" onclick="openQrModal('${s.id}')" class="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-qrcode ml-1"></i>QR</button>
+        <button type="button" onclick="resetStudentMonth('${s.id}')" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-left ml-1"></i>تصفير</button>
+        <button type="button" onclick="deleteStudent('${s.id}')" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-trash ml-1"></i>حذف</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderMobileCard(s,index){
+  const d=ensureStudentData(s.id),cont=continuousTotal(d),final=finalGrade(d);
+  return `<article class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+    <div class="flex items-start justify-between gap-3 mb-4"><div class="min-w-0"><div class="text-xs text-slate-500">التلميذ ${index+1}</div><h3 class="font-extrabold text-lg break-words">${escapeHtml(s.name)}</h3></div><button type="button" onclick="deleteStudent('${s.id}')" class="shrink-0 bg-rose-50 text-rose-700 px-3 py-2 rounded-lg text-sm"><i class="fa-solid fa-trash"></i></button></div>
+    <div class="grid grid-cols-2 gap-3">
+      ${CATEGORIES.map(([key,label,max])=>`<label class="block"><span class="text-xs font-bold text-slate-600">${label} / ${max}</span>${scoreInput(s.id,key,d[key],max).replace('class="score-input','class="mobile-score border rounded-lg text-center py-2 w-full')}</label>`).join('')}
+      <label class="block"><span class="text-xs font-bold text-slate-600">الامتحان الشهري / ١٠٠</span><input type="number" inputmode="numeric" min="0" max="100" value="${Number(d.monthlyExam)||0}" onchange="setMonthlyExam('${s.id}',this.value)" class="mobile-score border rounded-lg text-center py-2 w-full"></label>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-4 text-center"><div class="bg-slate-50 rounded-xl p-2"><div class="text-xs text-slate-500">المجموع الشفوي</div><b>${cont} / 100</b></div><div class="bg-slate-50 rounded-xl p-2"><div class="text-xs text-slate-500">الدرجة النهائية</div><b>${fmt(final)} / 100</b></div></div>
+    <label class="block mt-3"><span class="text-xs font-bold text-slate-600">التقييم العام</span><select onchange="setOverall('${s.id}',this.value)" class="w-full border rounded-lg px-3 py-2 mt-1"><option value="">اختر التقييم</option>${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    <div class="grid grid-cols-2 gap-2 mt-3"><button type="button" onclick="openQrModal('${s.id}')" class="bg-violet-600 text-white py-2 rounded-xl font-bold"><i class="fa-solid fa-qrcode ml-1"></i>QR ولي الأمر</button><button type="button" onclick="openReport('${s.id}')" class="bg-sky-600 text-white py-2 rounded-xl font-bold"><i class="fa-solid fa-chart-column ml-1"></i>فتح السجل</button></div>
+  </article>`;
+}
+
+function renderTable(){
+  renderHeader();
+  const q=($('search').value||'').trim().toLowerCase();
+  const list=state.students.filter(s=>s.name.toLowerCase().includes(q));
+  const noStudents=state.students.length===0;
+  $('emptyState').classList.toggle('hidden',!noStudents);
+  $('tableWrap').classList.toggle('hidden',noStudents);
+  $('mobileStudents').classList.toggle('hidden',list.length===0);
+  $('tableBody').innerHTML=list.map(renderDesktopRow).join('')||`<tr><td colspan="20" class="text-center p-8 text-slate-500">لا توجد نتائج مطابقة للبحث.</td></tr>`;
+  $('mobileStudents').innerHTML=list.map(renderMobileCard).join('');
+  renderStats();
+}
+
+function renderStats(){
+  const students=state.students||[];
+  const data=students.map(s=>ensureStudentData(s.id));
+  const finals=data.map(finalGrade);
+  const completed=data.filter(d=>CATEGORIES.every(([key])=>Number(d[key]||0)>0)&&Number(d.monthlyExam||0)>0).length;
+  const avg=finals.length?finals.reduce((a,b)=>a+b,0)/finals.length:0;
+  const high=finals.length?Math.max(...finals):0;
+  $('statStudents').textContent=students.length.toLocaleString('ar-IQ');
+  $('statCompleted').textContent=completed.toLocaleString('ar-IQ');
+  $('statAverage').textContent=finals.length?fmt(avg):'—';
+  $('statHighest').textContent=finals.length?fmt(high):'—';
+}
+
+function resetStudentMonth(id){
+  const s=state.students.find(x=>x.id===id);if(!s)return;
+  if(!confirm(`سيتم تصفير درجات الطالب "${s.name}" في شهر ${state.settings.month} فقط. هل تريد المتابعة؟`))return;
+  const md=monthData(); delete md[id]; saveState(); renderTable();
+  if(currentReportId===id && !$('reportModal').classList.contains('hidden')) openReport(id);
+}
+
+function deleteStudent(id){
+  const s=state.students.find(x=>x.id===id);
+  if(!s||!confirm(`هل تريد حذف الطالب "${s.name}"؟`))return;
+  state.students=state.students.filter(x=>x.id!==id);
+  Object.values(state.months).forEach(m=>delete m[id]);
+  saveState();renderTable();
+}
+
+let currentQrId=null;
+function buildParentSnapshot(id){
+  const student=state.students.find(s=>s.id===id);
+  if(!student)return null;
+  const months=MONTHS.map(month=>{
+    const key=`${state.settings.subject}__${month}`;
+    const d=state.months[key]?.[id];
+    if(!d)return null;
+    const normalized={}; CATEGORIES.forEach(([k,,max])=>normalized[k]=Math.min(max,Number(d[k]||0)));
+    normalized.monthlyExam=Math.min(100,Number(d.monthlyExam||0));
+    normalized.final=finalGrade(normalized);
+    normalized.overall=d.overall||'';
+    return {month,data:normalized};
+  }).filter(Boolean);
+  return {v:1,name:student.name,school:state.settings.school,className:state.settings.className,subject:state.settings.subject,months};
+}
+function openQrModal(id){
+  currentQrId=id; const s=state.students.find(x=>x.id===id); if(!s)return;
+  const box=$('qrBox'); box.innerHTML='';
+  const snapshot=buildParentSnapshot(id);
+  const payload=btoa(unescape(encodeURIComponent(JSON.stringify(snapshot))));
+  new QRCode(box,{text:location.origin+location.pathname+'#parent='+encodeURIComponent(payload),width:230,height:230,colorDark:'#0f172a',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  $('qrStudentName').textContent=`${s.name} — ${state.settings.className||''}`;
+  openModal('qrModal');
+}
+function downloadQr(){
+  const img=$('qrBox').querySelector('img'); if(!img)return;
+  const a=document.createElement('a'); a.href=img.src; a.download=`QR - ${state.students.find(s=>s.id===currentQrId)?.name||'طالب'}.png`; a.click();
+}
+function printQr(){
+  const s=state.students.find(x=>x.id===currentQrId); if(!s)return;
+  const img=$('qrBox').querySelector('img'); if(!img)return;
+  const w=window.open('','_blank');
+  w.document.write(`<html dir=\"rtl\"><head><title>QR - ${escapeHtml(s.name)}</title><style>body{font-family:Arial;text-align:center;padding:40px}img{width:280px}h2{margin-bottom:8px}</style></head><body><h2>رمز متابعة درجات التلميذ</h2><h3>${escapeHtml(s.name)}</h3><p>${escapeHtml(state.settings.school||'')} — ${escapeHtml(state.settings.className||'')}</p><img src=\"${img.src}\"><p>يمثل درجات الأشهر المحفوظة وقت إنشاء الرمز.</p><script>window.onload=()=>window.print()<\/script></body></html>`); w.document.close();
+}
+function openParentFromHash(){
+  if(!location.hash.startsWith('#parent='))return;
+  try{
+    const raw=decodeURIComponent(location.hash.slice(8));
+    const obj=JSON.parse(decodeURIComponent(escape(atob(raw))));
+    const rows=(obj.months||[]).map(x=>{const d=x.data;return `<tr><td>${escapeHtml(x.month)}</td><td>${d.shortTests}/${20}</td><td>${d.dailyPrep}/${20}</td><td>${d.homework}/${20}</td><td>${d.notebook}/${20}</td><td>${d.absence}/${10}</td><td>${d.behavior}/${10}</td><td><b>${d.final}/100</b></td></tr>`}).join('');
+    document.body.innerHTML=`<div dir=\"rtl\" style=\"font-family:Cairo,Arial;background:#f1f5f9;min-height:100vh;padding:20px\"><div style=\"max-width:1000px;margin:auto;background:white;border-radius:20px;padding:22px;box-shadow:0 8px 30px #0001\"><h1 style=\"margin:0 0 6px;color:#0f172a\">متابعة درجات التلميذ</h1><p style=\"color:#64748b\">${escapeHtml(obj.school||'')} — ${escapeHtml(obj.className||'')} — ${escapeHtml(obj.subject||'')}</p><h2>${escapeHtml(obj.name)}</h2><div style=\"overflow:auto\"><table style=\"width:100%;border-collapse:collapse;text-align:center\"><thead><tr style=\"background:#0f172a;color:#fff\"><th>الشهر</th><th>اختبارات</th><th>تحضير</th><th>واجب</th><th>دفتر</th><th>غياب</th><th>سلوك</th><th>النهائية</th></tr></thead><tbody>${rows||'<tr><td colspan=\"8\" style=\"padding:20px\">لا توجد درجات منشورة بعد.</td></tr>'}</tbody></table></div><p style=\"margin-top:18px;color:#64748b;font-size:13px\">هذه البيانات هي نسخة محفوظة وقت إنشاء رمز QR.</p></div></div>`;
+  }catch(e){document.body.innerHTML='<div dir=\"rtl\" style=\"font-family:Arial;padding:40px;text-align:center\"><h2>تعذر قراءة رمز QR</h2><p>يرجى طلب رمز محدث من المعلم.</p></div>';}
+}
+
+function openReport(id){
+  const s=state.students.find(x=>x.id===id);if(!s)return;
+  currentReportId=id;
+  const d=ensureStudentData(id);
+  $('reportTitle').textContent=`التقرير الشهري: ${s.name}`;
+  $('reportSubtitle').textContent=`${state.settings.school||'المدرسة'} — ${state.settings.className||'الصف'} — ${state.settings.subject} — ${state.settings.month}`;
+  $('reportContent').innerHTML=`
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">المجموع الشفوي</div><div class="text-2xl font-extrabold">${continuousTotal(d)} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الامتحان الشهري</div><div class="text-2xl font-extrabold">${d.monthlyExam} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">الدرجة النهائية</div><div class="text-2xl font-extrabold">${fmt(finalGrade(d))} / 100</div></div>
+      <div class="bg-slate-50 rounded-xl p-3"><div class="text-xs text-slate-500">التقييم</div><div class="font-bold mt-1">${d.overall||'غير محدد'}</div></div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+      ${CATEGORIES.map(([key,label,max])=>`<label class="block"><span class="font-bold block mb-2">${label} (${max})</span><input type="number" inputmode="numeric" min="0" max="${max}" value="${d[key]}" onchange="setCategoryScore('${s.id}','${key}',this.value);openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5"></label>`).join('')}
+      <label class="block"><span class="font-bold block mb-2">الامتحان الشهري (١٠٠)</span><input type="number" inputmode="numeric" min="0" max="100" value="${d.monthlyExam}" onchange="setMonthlyExam('${s.id}',this.value);openReport('${s.id}')" class="w-full border rounded-xl px-4 py-2.5"></label>
+    </div>
+    <div class="mt-5"><label class="font-bold block mb-2">التقييم العام</label><select onchange="setOverallFromReport(this.value)" class="border rounded-xl px-4 py-2.5 w-full"><option value="">اختر التقييم</option>${['ممتاز','جيد جداً','جيد','مقبول','بحاجة لتحسين'].map(x=>`<option ${d.overall===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="flex flex-wrap justify-end gap-2 mt-5"><button type="button" onclick="openQrModal('${s.id}')" class="bg-violet-600 text-white px-5 py-2.5 rounded-xl font-bold"><i class="fa-solid fa-qrcode ml-1"></i> QR ولي الأمر</button><button type="button" onclick="printStudentReport()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold"><i class="fa-solid fa-print ml-1"></i> طباعة تقرير A4</button><button type="button" onclick="closeModal('reportModal')" class="border px-5 py-2.5 rounded-xl">إغلاق</button></div>`;
+  openModal('reportModal');
+}
+
+function setOverallFromReport(value){if(!currentReportId)return;ensureStudentData(currentReportId).overall=value;saveState();openReport(currentReportId)}
+
+function printStudentReport(){
+  const s=state.students.find(x=>x.id===currentReportId);if(!s)return;
+  const d=ensureStudentData(s.id);
+  const rows=CATEGORIES.map(([key,label,max])=>`<tr><td>${label}</td><td>${d[key]} / ${max}</td></tr>`).join('');
+  $('printReport').innerHTML=`<div dir="rtl" style="font-family:Cairo,Arial,sans-serif;color:#111">
+    <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:18px">
+      <div style="font-size:16px;font-weight:700">جمهورية العراق</div>
+      <div style="font-size:18px;font-weight:800">تقييم التلاميذ لشهر ${escapeHtml(state.settings.month)}</div>
+      <div style="font-size:13px">${escapeHtml(state.settings.school||'')}</div>
+    </div>
+    <table style="width:100%;margin-bottom:16px;font-size:13px"><tr><td><b>الطالب:</b> ${escapeHtml(s.name)}</td><td><b>الصف:</b> ${escapeHtml(state.settings.className||'')}</td></tr><tr><td><b>المادة:</b> ${escapeHtml(state.settings.subject)}</td><td><b>الشهر:</b> ${escapeHtml(state.settings.month)}</td></tr></table>
+    <table style="width:100%;border-collapse:collapse;text-align:center;font-size:12px"><thead><tr style="background:#eee"><th>الحقل</th><th>الدرجة</th></tr></thead><tbody>${rows}</tbody></table>
+    <table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:13px">
+      <tr><td style="border:1px solid #aaa;padding:8px"><b>المجموع الشفوي</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${continuousTotal(d)} / 100</b></td></tr>
+      <tr><td style="border:1px solid #aaa;padding:8px">الامتحان الشهري</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${d.monthlyExam} / 100</td></tr>
+      <tr><td style="border:1px solid #aaa;padding:8px"><b>الدرجة النهائية</b></td><td style="border:1px solid #aaa;padding:8px;text-align:center"><b>${fmt(finalGrade(d))} / 100</b></td></tr>
+      <tr><td style="border:1px solid #aaa;padding:8px">التقييم العام</td><td style="border:1px solid #aaa;padding:8px;text-align:center">${escapeHtml(d.overall||'غير محدد')}</td></tr>
+    </table>
+    <div style="margin-top:70px;display:flex;justify-content:space-around;text-align:center"><div>معلم المادة<br><b>كرار علي كامل</b><br>____________________<br>التوقيع</div><div>مدير المدرسة<br><b>سعود محسن احمد</b><br>____________________<br>التوقيع والختم</div></div>
+  </div>`;
+  window.print();
+}
+
+function clearMonth(){
+  if(!confirm(`سيتم مسح جميع درجات ${state.settings.subject} لشهر ${state.settings.month}. هل أنت متأكد؟`))return;
+  delete state.months[currentKey()];saveState();renderTable();
+}
+function exportExcel(){
+  if(!state.students.length)return alert('لا توجد بيانات لتصديرها.');
+  const rows=state.students.map((s,i)=>{
+    const d=ensureStudentData(s.id),r={'ت':i+1,'اسم الطالب':s.name};
+    CATEGORIES.forEach(([key,label,max])=>r[`${label} (${max})`]=d[key]);
+    r['المجموع الشفوي (١٠٠)']=continuousTotal(d);
+    r['الامتحان الشهري (١٠٠)']=d.monthlyExam;
+    r['الدرجة النهائية (المجموع ÷ ٢)']=finalGrade(d);
+    r['التقييم العام']=d.overall||'';
+    return r;
+  });
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.max(14,Math.min(34,k.length+5))}));
+  ws['!autofilter']={ref:ws['!ref']};ws['!sheetViews']=[{rightToLeft:true}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'تقييم التلاميذ');
+  const safe=s=>s.replace(/[\\/:*?"<>|]/g,'-').trim();
+  XLSX.writeFile(wb,`تقييم التلاميذ - ${safe(state.settings.subject)} - ${safe(state.settings.month)}.xlsx`,{bookType:'xlsx',compression:true});
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+setup();
+</script>
+</body>
+</html>
